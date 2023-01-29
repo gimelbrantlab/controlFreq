@@ -15,3 +15,5 @@ Please see Wiki page connected to this repository.
 * For allelic bias test and differential AI test, see [Qllelic R-package](https://github.com/gimelbrantlab/Qllelic) functions and *["Replicate sequencing libraries are important for quantification of allelic imbalance", A.Mendelevich et.al](https://www.nature.com/articles/s41467-021-23544-8)*.
 
 * For data preprocessing procedure used in the paper and relevant recommendations, see [fastq2allelictabs](https://github.com/gimelbrantlab/fastq2allelictabs) repository.
+
+![pic](https://github.com/gimelbrantlab/fastq2allelictabs/blob/main/schemes/ControlFreq_for_GitHub.png)
