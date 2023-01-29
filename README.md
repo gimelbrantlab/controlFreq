@@ -17,3 +17,5 @@ Please see Wiki page connected to this repository.
 * For data preprocessing procedure used in the paper and relevant recommendations, see [fastq2allelictabs](https://github.com/gimelbrantlab/fastq2allelictabs) repository.
 
 ![pic](https://github.com/gimelbrantlab/fastq2allelictabs/blob/main/schemes/ControlFreq_for_GitHub.png)
+
+Figure was made in biorender.
