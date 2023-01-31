@@ -1,7 +1,7 @@
 # controlFreq
-The elaborate method for quantification of allele-specific expression. 
+The elaborate method for quantification of allele-specific expression on poly-A RNA-seq data. 
 
-This R-package performs **sample overdispersion estimation** from RNA spike-ins and technical replication. 
+This R-package performs **sample overdispersion estimation** from RNA spike-ins or technical replication. 
 
 ## Installation:
 ```
