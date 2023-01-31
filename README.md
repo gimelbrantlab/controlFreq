@@ -12,6 +12,9 @@ devtools::install_github("gimelbrantlab/controlFreq")
 ```
 compute_iQCC_for_selected_samples(df = allelic-counts-table, reps = 1:10, sup_Q = 30)
 ```
+see Wiki for more details.
+
+## Related repositories:
 
 * For allelic bias test and differential AI test, see [Qllelic R-package](https://github.com/gimelbrantlab/Qllelic) functions and *["Replicate sequencing libraries are important for quantification of allelic imbalance", A.Mendelevich et.al](https://www.nature.com/articles/s41467-021-23544-8)*.
 
@@ -19,4 +22,4 @@ compute_iQCC_for_selected_samples(df = allelic-counts-table, reps = 1:10, sup_Q 
 
 ![pic](https://github.com/gimelbrantlab/fastq2allelictabs/blob/main/schemes/ControlFreq_for_GitHub.png)
 
-Figure was made in biorender.
+Figure above was made in [biorender](https://biorender.com/).
