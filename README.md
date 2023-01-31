@@ -7,10 +7,11 @@ This R-package performs **sample overdispersion estimation** from RNA spike-ins 
 ```
 devtools::install_github("gimelbrantlab/controlFreq")
 ```
-Dependencies: [Qllelic](https://github.com/gimelbrantlab/Qllelic) 
 
-## Usage:
-Please see Wiki page connected to this repository.
+## Example usage:
+```
+compute_iQCC_for_selected_samples(df = allelic-counts-table, reps = 1:10, sup_Q = 30)
+```
 
 * For allelic bias test and differential AI test, see [Qllelic R-package](https://github.com/gimelbrantlab/Qllelic) functions and *["Replicate sequencing libraries are important for quantification of allelic imbalance", A.Mendelevich et.al](https://www.nature.com/articles/s41467-021-23544-8)*.
 
