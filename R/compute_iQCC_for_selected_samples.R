@@ -19,7 +19,7 @@ compute_iQCC_for_selected_samples <- function(df, reps, inf_Q=1, sup_Q=1){
     iQCC_ex = sqrt(dextbetabinom_max_likelihood_Q(allele_counts = pack_ex[,2:3], AI_vect = pack_ex[,4], sup_Q = sup_Q))
     print(sqrt(iQCC_in*iQCC_ex))
     return(list(
-      iQCC_inclused_inAI = iQCC_in,
+      iQCC_included_inAI = iQCC_in,
       iQCC_excluded_inAI = iQCC_ex,
       iQCC_geom_mean = sqrt(iQCC_in*iQCC_ex)
     ))
