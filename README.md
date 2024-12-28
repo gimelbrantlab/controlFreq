@@ -7,7 +7,7 @@ Paper: _[Foreign RNA spike-ins enable accurate allele-specific expression analys
 
 ## Installation:
 ```
-devtools::install_github("gimelbrantlab/controlFreq")
+remotes::install_github("gimelbrantlab/controlFreq")
 ```
 
 ## Example usage:
