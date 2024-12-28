@@ -3,6 +3,8 @@ The elaborate method for quantification of allele-specific expression on poly-A 
 
 This R-package performs **sample overdispersion estimation** from RNA spike-ins or technical replication. 
 
+[Foreign RNA spike-ins enable accurate allele-specific expression analysis at scale](https://academic.oup.com/bioinformatics/article/39/Supplement_1/i431/7210455?login=false), Asia Mendelevich, Saumya Gupta, Aleksei Pakharev, Athanasios Teodosiadis, Andrey A Mironov, Alexander A Gimelbrant
+
 ## Installation:
 ```
 devtools::install_github("gimelbrantlab/controlFreq")
