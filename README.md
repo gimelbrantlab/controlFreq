@@ -7,6 +7,10 @@ Paper: _[Foreign RNA spike-ins enable accurate allele-specific expression analys
 
 ## Installation:
 ```
+docker pull sasha/ase
+```
+or
+```
 remotes::install_github("gimelbrantlab/controlFreq")
 ```
 
