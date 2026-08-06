@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QCC / iQCC and the interpretation of an allelic-imbalance point estimate</title>
+<style>
+:root{
+  color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+  --s1:#2a78d6;   /* sample A / QCC-corrected */
+  --s2:#eb6834;   /* sample B */
+  --ref:#898781;  /* binomial reference */
+  --s1-wash:rgba(42,120,214,0.14);
+  --s2-wash:rgba(235,104,52,0.14);
+  --ref-wash:rgba(137,135,129,0.16);
+  --chip:rgba(11,11,11,0.05);
+  --verdict-fill:#1c5cab;  /* blue 550 — white text 6.6:1 */
+}
+@media (prefers-color-scheme: dark){
+  :root:where(:not([data-theme="light"])){
+    color-scheme: dark;
+    --page:#0d0d0d; --surface:#1a1a19;
+    --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#d95926; --ref:#898781;
+    --s1-wash:rgba(57,135,229,0.18);
+    --s2-wash:rgba(217,89,38,0.18);
+    --ref-wash:rgba(137,135,129,0.18);
+    --chip:rgba(255,255,255,0.06);
+    --verdict-fill:#256abf;  /* blue 500 — white text 5.4:1 on dark */
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19;
+  --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+  --s1:#3987e5; --s2:#d95926; --ref:#898781;
+  --s1-wash:rgba(57,135,229,0.18);
+  --s2-wash:rgba(217,89,38,0.18);
+  --ref-wash:rgba(137,135,129,0.18);
+  --chip:rgba(255,255,255,0.06);
+  --verdict-fill:#256abf;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--page); color:var(--ink);
+  font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:18px 20px 56px;
+}
+.wrap{max-width:1360px;margin:0 auto}
+h1{font-size:20px;line-height:1.25;margin:0 0 4px;font-weight:650;letter-spacing:-0.01em}
+.sub{color:var(--ink2);margin:0;font-size:14px;max-width:112ch}
+.cite{color:var(--muted);font-size:13px}
+.cite a{color:var(--ink2)}
+header{margin-bottom:12px}
+
+/* ---- app shell: main column + sticky sidebar ---- */
+.app{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+.mainc{min-width:0}
+.side{
+  position:sticky;top:14px;background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:2px 16px 14px;
+  max-height:calc(100vh - 28px);overflow-y:auto;
+}
+.sgrp{padding:14px 0;border-bottom:1px solid var(--border)}
+.sgrp:last-child{border-bottom:none}
+.sgrp h4{font-size:11px;margin:0 0 12px;font-weight:640;color:var(--muted);
+  letter-spacing:0.07em;text-transform:uppercase}
+.srow{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.srow:last-child{margin-bottom:0}
+.srow>label,.numpair label{font-size:12px;color:var(--ink2);font-weight:560;
+  display:block}
+.numpair label{margin-bottom:4px}
+.qccline{display:flex;align-items:center;gap:12px}
+.side input[type=range]{width:100%;min-width:0}
+.numpair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.numpair input[type=number]{width:100%}
+@media (max-width:1040px){
+  .app{grid-template-columns:1fr}
+  .side{position:static;max-height:none}
+}
+
+.card{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:16px 18px; margin-bottom:14px;
+}
+.notescard{background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:13px 18px}
+.notescard .notes{margin-top:12px}
+
+/* ---- controls ---- */
+.hint{font-size:11.5px;color:var(--muted);line-height:1.4}
+input[type=range]{width:220px;accent-color:var(--s1)}
+input[type=range].b{accent-color:var(--s2)}
+input[type=number]{
+  width:82px;padding:5px 7px;font:inherit;font-size:14px;
+  font-variant-numeric:tabular-nums;
+  background:var(--page);color:var(--ink);
+  border:1px solid var(--border);border-radius:6px;
+}
+input[type=number]:focus-visible,button:focus-visible,input[type=range]:focus-visible,
+input[type=checkbox]:focus-visible{outline:2px solid var(--s1);outline-offset:2px}
+.qccval{font-size:23px;font-weight:640;letter-spacing:-0.01em;line-height:1;
+  min-width:58px;display:inline-block;font-variant-numeric:tabular-nums}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+button.preset{
+  font:inherit;font-size:12.5px;padding:4px 10px;border-radius:999px;cursor:pointer;
+  background:var(--chip);color:var(--ink2);border:1px solid var(--border);
+}
+button.preset:hover{color:var(--ink)}
+button.preset[aria-pressed="true"]{
+  background:var(--s1);border-color:var(--s1);color:#fff;
+}
+.chk{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2)}
+.chk input{accent-color:var(--s1);width:15px;height:15px}
+
+/* ---- tabs ---- */
+.tabs{display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid var(--border)}
+button.tab{
+  font:inherit;font-size:13.5px;font-weight:560;padding:9px 14px;cursor:pointer;
+  background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--muted);margin-bottom:-1px;
+}
+button.tab:hover{color:var(--ink2)}
+button.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--s1)}
+
+/* ---- chart ---- */
+.plotwrap{position:relative}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin:15px 0 6px;font-size:12.5px;color:var(--ink2)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.swatch{width:22px;height:0;border-top-width:2px;border-top-style:solid;display:inline-block}
+.tip{
+  position:absolute;pointer-events:none;opacity:0;transition:opacity .09s;
+  background:var(--surface);border:1px solid var(--border);border-radius:7px;
+  padding:8px 10px;font-size:12.5px;line-height:1.45;color:var(--ink);
+  box-shadow:0 4px 16px rgba(0,0,0,0.13);white-space:nowrap;z-index:5;
+  font-variant-numeric:tabular-nums;
+}
+.tip b{font-weight:620}
+.tip .k{color:var(--muted);display:inline-block;min-width:78px}
+
+/* ---- stat tiles ---- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));
+  gap:1px;background:var(--border);border:1px solid var(--border);
+  border-radius:9px;overflow:hidden;margin-top:16px}
+.tile{background:var(--surface);padding:12px 14px}
+.tile .k{font-size:11.5px;color:var(--muted);letter-spacing:0.03em;
+  text-transform:uppercase;font-weight:560;margin-bottom:5px}
+.tile .v{font-size:20px;font-weight:620;letter-spacing:-0.01em;line-height:1.15}
+.tile .v small{font-size:12.5px;font-weight:500;color:var(--ink2);letter-spacing:0}
+.tile.acc .v{color:var(--s1)}
+
+/* ---- verdict banner ---- */
+.verdict{
+  display:grid;grid-template-columns:minmax(150px,0.85fr) auto minmax(230px,1.5fr);
+  border:1px solid var(--border);border-radius:11px;overflow:hidden;
+  transition:box-shadow .2s ease;
+}
+.verdict.flipped{box-shadow:0 0 0 2px var(--s2)}
+.verdict .k{font-size:11px;color:currentColor;opacity:.62;letter-spacing:0.07em;
+  text-transform:uppercase;font-weight:600;margin-bottom:6px}
+.vside{padding:14px 18px;background:var(--page);color:var(--ink2)}
+.vside .lab{font-size:15px;font-weight:620;color:var(--ink)}
+.vside.off .lab{color:var(--muted)}
+.vside .sub{font-size:12.5px;color:var(--muted);margin-top:4px;
+  font-variant-numeric:tabular-nums}
+.varrow{display:flex;align-items:center;justify-content:center;padding:0 16px;
+  background:var(--page);color:var(--muted);font-size:20px;line-height:1}
+.vmain{padding:16px 22px;transition:background-color .2s ease,color .2s ease}
+.vmain.on{background:var(--verdict-fill);color:#fff}
+.vmain.off{background:var(--page);color:var(--muted);
+  box-shadow:inset 3px 0 0 var(--axis)}
+.vmain.on .k{opacity:.8}
+.vmain .big{display:flex;align-items:center;gap:13px;
+  font-size:27px;font-weight:680;letter-spacing:-0.018em;line-height:1.1}
+.vmain .glyph{width:22px;height:22px;border-radius:50%;flex:none}
+.vmain.on .glyph{background:#fff}
+.vmain.off .glyph{border:2px dashed currentColor}
+.vmain .sub{font-size:13px;margin-top:7px;opacity:.9;
+  font-variant-numeric:tabular-nums}
+.vmain.on .sub{opacity:1}
+@keyframes vpulse{0%{transform:scale(1)}34%{transform:scale(1.016)}100%{transform:scale(1)}}
+.verdict.pulse{animation:vpulse .3s ease}
+@media (prefers-reduced-motion:reduce){
+  .verdict.pulse{animation:none}
+  .vmain{transition:none}
+}
+@media (max-width:620px){
+  .verdict{grid-template-columns:1fr}
+  .varrow{padding:2px 0;transform:rotate(90deg)}
+  .vmain.off{box-shadow:inset 0 3px 0 var(--axis)}
+}
+
+.callout{
+  margin-top:16px;padding:12px 14px;border-radius:8px;
+  background:var(--chip);border:1px solid var(--border);
+  font-size:13.5px;line-height:1.55;color:var(--ink2);
+}
+.callout b{color:var(--ink);font-weight:620}
+.warn{color:var(--ink);border-color:var(--s2)}
+
+details{margin-top:14px;font-size:13px}
+summary{cursor:pointer;color:var(--ink2);font-size:12.5px;font-weight:560;
+  letter-spacing:0.02em}
+summary:hover{color:var(--ink)}
+table{border-collapse:collapse;margin-top:10px;font-size:12.5px;
+  font-variant-numeric:tabular-nums;width:100%}
+th,td{text-align:right;padding:5px 10px;border-bottom:1px solid var(--border)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--muted);font-weight:560;font-size:11.5px;letter-spacing:0.03em;
+  text-transform:uppercase}
+.scroll{overflow-x:auto}
+
+.notes{font-size:13px;color:var(--ink2);line-height:1.65}
+.notes code{font-size:12.5px;background:var(--chip);padding:1px 5px;border-radius:4px}
+.notes p{margin:0 0 10px}
+.notes ul{margin:0 0 10px;padding-left:20px}
+.eq{font-size:13px;color:var(--ink);background:var(--chip);border:1px solid var(--border);
+  border-radius:7px;padding:10px 13px;margin:0 0 12px;overflow-x:auto;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>What QCC does to an allelic-imbalance point estimate</h1>
+  <p class="sub">The AI point estimate never moves. Its confidence interval &mdash; and
+  whether the gene gets called at all &mdash; is set by the overdispersion coefficient
+  QCC (per sample: iQCC). <span class="cite">After
+  <a href="https://doi.org/10.1038/s41467-021-23544-8" target="_blank" rel="noopener">Mendelevich&nbsp;2021</a>
+  Fig.&nbsp;1a/3 and
+  <a href="https://doi.org/10.1093/bioinformatics/btad254" target="_blank" rel="noopener">Mendelevich&nbsp;2023</a>
+  Fig.&nbsp;1a&ndash;e. AI = maternal / (maternal&nbsp;+&nbsp;paternal).</span></p>
+</header>
+
+<div class="tabs" role="tablist">
+  <button class="tab" id="tab1" role="tab" aria-selected="true" aria-controls="sc1">
+    1 &middot; One sample vs 1:1</button>
+  <button class="tab" id="tab2" role="tab" aria-selected="false" aria-controls="sc2">
+    2 &middot; Two samples, same gene</button>
+</div>
+
+<div class="app">
+
+  <!-- ============ MAIN COLUMN ============ -->
+  <main class="mainc">
+
+    <!-- ---------- SCENARIO 1 ---------- -->
+    <section id="sc1" role="tabpanel" aria-labelledby="tab1">
+      <div class="card">
+        <div class="verdict" id="verdict1"></div>
+        <div class="legend" id="lg1"></div>
+        <div class="plotwrap">
+          <svg id="svg1" viewBox="0 0 920 372" role="img"
+               aria-label="Null distribution of AI at 1:1 under binomial and QCC-corrected models, with confidence intervals for the observed point estimate"></svg>
+          <div class="tip" id="tip1"></div>
+        </div>
+        <div class="tiles" id="tiles1"></div>
+        <div class="callout" id="call1"></div>
+        <details>
+          <summary>Table view</summary>
+          <div class="scroll"><table id="tbl1"></table></div>
+        </details>
+      </div>
+    </section>
+
+    <!-- ---------- SCENARIO 2 ---------- -->
+    <section id="sc2" role="tabpanel" aria-labelledby="tab2" hidden>
+      <div class="card">
+        <div class="verdict" id="verdict2"></div>
+        <div class="legend" id="lg2"></div>
+        <div class="plotwrap">
+          <svg id="svg2" viewBox="0 0 920 432" role="img"
+               aria-label="Sampling distributions of AI for two samples under binomial and per-sample iQCC-corrected models, with confidence intervals"></svg>
+          <div class="tip" id="tip2"></div>
+        </div>
+        <div class="tiles" id="tiles2"></div>
+        <div class="callout" id="call2"></div>
+        <details>
+          <summary>Table view</summary>
+          <div class="scroll"><table id="tbl2"></table></div>
+        </details>
+      </div>
+    </section>
+
+    <details class="notescard">
+      <summary>What the page computes</summary>
+      <div class="notes">
+        <p>Observed allelic counts are modelled as an <b>extended beta-binomial</b> with
+        <code>Q = QCC&sup2;</code>
+        (<a href="https://doi.org/10.1093/bioinformatics/btad254" target="_blank"
+        rel="noopener">Mendelevich&nbsp;2023</a>, &sect;2.1.1):
+        <code>m ~ eBB(n, AI, Q)</code> with shape
+        <code>&delta; = (Q&minus;1)/(n&minus;Q)</code>,
+        <code>&alpha; = AI/&delta;</code>, <code>&beta; = (1&minus;AI)/&delta;</code>.</p>
+        <div class="eq">Var(m) = QCC&sup2; &middot; n &middot; AI(1&minus;AI)&nbsp;&nbsp;&nbsp;&#8658;&nbsp;&nbsp;&nbsp;SD(AI) = QCC &middot; &radic;(AI(1&minus;AI)/n)</div>
+        <p>So QCC is exactly a <b>widening coefficient on the binomial quantiles</b>, and it
+        is equivalent to having sequenced <code>n / QCC&sup2;</code> allelic reads. Tests and
+        intervals follow
+        <a href="https://doi.org/10.1038/s41467-021-23544-8" target="_blank"
+        rel="noopener">Mendelevich&nbsp;2021</a> Eq.&nbsp;11: run R's <code>prop.test</code>
+        (Wilson score interval with continuity correction) on counts divided by
+        <code>QCC&sup2;</code>. Both are reimplemented here in JavaScript and checked against
+        R (Yates correction, CI construction, and p-values agree to six significant figures).
+        In scenario&nbsp;2 each sample is deflated by <b>its own</b> <code>iQCC&sup2;</code>,
+        as controlFreq does &mdash; so a single noisy library limits the comparison on its
+        own.</p>
+        <ul>
+          <li><b>The point estimate never changes</b> &mdash; <code>AI = m/(m+p)</code>,
+          independent of QCC. Only the interval around it does.</li>
+          <li>Scenario 1 tests <code>H&#8320;: AI = 0.5</code> (one-sample). Scenario 2 tests
+          <code>H&#8320;: AI&#8320;&#8321; = AI&#8322;</code> (two-sample), the
+          differential-AI test.</li>
+          <li>Non-overlapping CIs is a <i>stricter</i> criterion than the two-sample test at
+          the same confidence level; the page reports the test, and the plot shows the
+          CIs.</li>
+          <li>Reported QCC/iQCC in these papers ranges roughly 1.4&ndash;2.6 across replicate
+          pairs, with iQCC&nbsp;&gt;&nbsp;4 seen in the noisiest libraries &mdash; a
+          16-fold overstatement of effective coverage by the naive binomial test.</li>
+        </ul>
+      </div>
+    </details>
+
+  </main>
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="side">
+
+    <!-- controls for scenario 1 -->
+    <div id="ctl1">
+      <div class="sgrp">
+        <h4>Overdispersion</h4>
+        <div class="srow">
+          <label for="qcc">QCC / iQCC</label>
+          <div class="qccline">
+            <span class="qccval" id="qccOut">1.70</span>
+            <input type="range" id="qcc" min="1" max="4" step="0.05" value="1.7"
+                   aria-label="QCC value">
+          </div>
+          <span class="hint" id="qccHint"></span>
+        </div>
+        <div class="srow">
+          <div class="presets" id="qccPresets">
+            <button class="preset" data-q="1">1.00</button>
+            <button class="preset" data-q="1.5">1.50</button>
+            <button class="preset" data-q="1.7">1.70</button>
+            <button class="preset" data-q="2.4">2.40</button>
+            <button class="preset" data-q="4">4.00</button>
+          </div>
+          <span class="hint">range spanned by real libraries in both papers</span>
+        </div>
+      </div>
+
+      <div class="sgrp">
+        <h4>Gene counts</h4>
+        <div class="srow">
+          <div class="numpair">
+            <div><label for="s1mat">maternal</label>
+              <input type="number" id="s1mat" value="66" min="1" step="1"></div>
+            <div><label for="s1pat">paternal</label>
+              <input type="number" id="s1pat" value="44" min="1" step="1"></div>
+          </div>
+        </div>
+        <div class="srow">
+          <label for="s1cov">total allelic coverage</label>
+          <input type="range" id="s1cov" min="20" max="2000" step="10" value="110"
+                 aria-label="total allelic coverage, holds AI fixed">
+          <span class="hint">rescales both counts, holds AI fixed</span>
+        </div>
+        <div class="srow">
+          <div class="presets" id="s1Presets">
+            <button class="preset" data-m="66" data-p="44">the call flips</button>
+            <button class="preset" data-m="660" data-p="440">deep coverage</button>
+            <button class="preset" data-m="80" data-p="30">strong bias</button>
+            <button class="preset" data-m="58" data-p="52">no bias</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- controls for scenario 2 -->
+    <div id="ctl2" hidden>
+      <div class="sgrp">
+        <h4>Overdispersion</h4>
+        <div class="srow">
+          <label for="qccA" style="color:var(--s1)">iQCC &mdash; sample A</label>
+          <div class="qccline">
+            <span class="qccval" id="qccAOut" style="color:var(--s1)">1.70</span>
+            <input type="range" id="qccA" min="1" max="4" step="0.05" value="1.7"
+                   aria-label="iQCC for sample A">
+          </div>
+          <span class="hint" id="qccAHint"></span>
+        </div>
+        <div class="srow">
+          <label for="qccB" style="color:var(--s2)">iQCC &mdash; sample B</label>
+          <div class="qccline">
+            <span class="qccval" id="qccBOut" style="color:var(--s2)">1.70</span>
+            <input type="range" class="b" id="qccB" min="1" max="4" step="0.05" value="1.7"
+                   aria-label="iQCC for sample B">
+          </div>
+          <label class="chk"><input type="checkbox" id="linkQ" checked> match sample A</label>
+        </div>
+        <div class="srow">
+          <div class="presets" id="qPresets">
+            <button class="preset" data-qa="1.7" data-qb="1.7">both typical</button>
+            <button class="preset" data-qa="1.2" data-qb="2.8">one bad library</button>
+            <button class="preset" data-qa="1" data-qb="1">both binomial</button>
+            <button class="preset" data-qa="2.6" data-qb="2.4">both noisy</button>
+          </div>
+          <span class="hint">a single noisy library can sink the comparison</span>
+        </div>
+      </div>
+
+      <div class="sgrp">
+        <h4>Gene counts</h4>
+        <div class="srow">
+          <label style="color:var(--s1)">sample A</label>
+          <div class="numpair">
+            <div><label for="s2amat">maternal</label>
+              <input type="number" id="s2amat" value="66" min="1" step="1"></div>
+            <div><label for="s2apat">paternal</label>
+              <input type="number" id="s2apat" value="44" min="1" step="1"></div>
+          </div>
+        </div>
+        <div class="srow">
+          <label style="color:var(--s2)">sample B</label>
+          <div class="numpair">
+            <div><label for="s2bmat">maternal</label>
+              <input type="number" id="s2bmat" value="44" min="1" step="1"></div>
+            <div><label for="s2bpat">paternal</label>
+              <input type="number" id="s2bpat" value="66" min="1" step="1"></div>
+          </div>
+        </div>
+        <div class="srow">
+          <div class="presets" id="s2Presets">
+            <button class="preset" data-v="66,44,44,66">the call flips</button>
+            <button class="preset" data-v="660,440,440,660">deep coverage</button>
+            <button class="preset" data-v="90,20,55,55">mono vs biallelic</button>
+            <button class="preset" data-v="62,48,58,52">no difference</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- shared display / testing options -->
+    <div class="sgrp">
+      <h4>Display</h4>
+      <label class="chk"><input type="checkbox" id="showIdeal" checked>
+        show ideal (binomial, QCC&nbsp;=&nbsp;1.0)</label>
+      <label class="chk"><input type="checkbox" id="autoZoom">
+        zoom AI axis to the data</label>
+    </div>
+
+    <div class="sgrp">
+      <h4>Multiple testing</h4>
+      <label class="chk"><input type="checkbox" id="bonf"> Bonferroni over</label>
+      <div class="srow" style="margin-top:8px">
+        <input type="number" id="bonfN" value="10000" min="1" step="1000"
+               aria-label="number of genes tested" style="width:100%">
+        <span class="hint" id="alphaHint">&alpha; = 0.05 (two-sided)</span>
+      </div>
+    </div>
+
+  </aside>
+</div>
+
+</div>
+<script>
+"use strict";
+/* ======================= math ======================= */
+function lgamma(x){
+  const g=7,c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,
+    771.32342877765313,-176.61502916214059,12.507343278686905,
+    -0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  if(x<0.5) return Math.log(Math.PI/Math.sin(Math.PI*x))-lgamma(1-x);
+  x-=1; let a=c[0]; const t=x+g+0.5;
+  for(let i=1;i<g+2;i++) a+=c[i]/(x+i);
+  return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a);
+}
+const lbeta=(a,b)=>lgamma(a)+lgamma(b)-lgamma(a+b);
+const lchoose=(n,k)=>lgamma(n+1)-lgamma(k+1)-lgamma(n-k+1);
+
+function erfc(x){ // Numerical Recipes erfcc, |eps| < 1.2e-7
+  const z=Math.abs(x),t=1/(1+z/2);
+  const ans=t*Math.exp(-z*z-1.26551223+t*(1.00002368+t*(0.37409196+t*(0.09678418+
+    t*(-0.18628806+t*(0.27886807+t*(-1.13520398+t*(1.48851587+
+    t*(-0.82215223+t*0.17087277)))))))));
+  return x>=0?ans:2-ans;
+}
+const pchisq1Upper = s => (s<=0?1:erfc(Math.sqrt(s/2)));
+
+function qnorm(p){ // Acklam
+  const a=[-3.969683028665376e+01,2.209460984245205e+02,-2.759285104469687e+02,
+           1.383577518672690e+02,-3.066479806614716e+01,2.506628277459239e+00],
+        b=[-5.447609879822406e+01,1.615858368580409e+02,-1.556989798598866e+02,
+           6.680131188771972e+01,-1.328068155288572e+01],
+        c=[-7.784894002430293e-03,-3.223964580411365e-01,-2.400758277161838e+00,
+           -2.549732539343734e+00,4.374664141464968e+00,2.938163982698783e+00],
+        d=[7.784695709041462e-03,3.224671290700398e-01,2.445134137142996e+00,
+           3.754408661907416e+00];
+  const pl=0.02425; let q,r;
+  if(p<pl){q=Math.sqrt(-2*Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/
+           ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+  if(p<=1-pl){q=p-0.5;r=q*q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/
+           (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);}
+  q=Math.sqrt(-2*Math.log(1-p));
+  return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/
+          ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+}
+
+/* R prop.test, k = 1 (one proportion vs p0) */
+function propTest1(x,n,p0,z){
+  const est=x/n;
+  const YATES=Math.min(0.5,Math.abs(x-n*p0));
+  const E=[n*p0,n*(1-p0)],O=[x,n-x];
+  let stat=0;
+  for(let i=0;i<2;i++) stat+=Math.pow(Math.abs(O[i]-E[i])-YATES,2)/E[i];
+  const z22n=z*z/(2*n);
+  let pc=est+YATES/n;
+  const hi = pc>=1?1:(pc+z22n+z*Math.sqrt(pc*(1-pc)/n+z22n/(2*n)))/(1+2*z22n);
+  pc=est-YATES/n;
+  const lo = pc<=0?0:(pc+z22n-z*Math.sqrt(pc*(1-pc)/n+z22n/(2*n)))/(1+2*z22n);
+  return {est,lo:Math.max(lo,0),hi:Math.min(hi,1),p:pchisq1Upper(stat),
+          minE:Math.min(E[0],E[1])};
+}
+/* R prop.test, k = 2 (two proportions) */
+function propTest2(x1,n1,x2,n2,z){
+  const p1=x1/n1,p2=x2/n2,pp=(x1+x2)/(n1+n2);
+  const E=[[n1*pp,n1*(1-pp)],[n2*pp,n2*(1-pp)]];
+  const O=[[x1,n1-x1],[x2,n2-x2]];
+  const YATES=Math.min(0.5,Math.abs(x1-E[0][0]));
+  let stat=0;
+  for(let i=0;i<2;i++)for(let j=0;j<2;j++) stat+=Math.pow(Math.abs(O[i][j]-E[i][j])-YATES,2)/E[i][j];
+  const delta=p1-p2;
+  const w=z*Math.sqrt(p1*(1-p1)/n1+p2*(1-p2)/n2)+YATES*(1/n1+1/n2);
+  return {delta,lo:Math.max(delta-w,-1),hi:Math.min(delta+w,1),p:pchisq1Upper(stat),
+          minE:Math.min(E[0][0],E[0][1],E[1][0],E[1][1])};
+}
+
+/* Sampling distribution of AI = m/n under eBB(n, ai, Q=qcc^2).
+   Returns {xs, ys} as a density on the AI scale. */
+function aiDensity(n,ai,qcc,nPts){
+  const Q=qcc*qcc, xs=[], ys=[];
+  const useBB = qcc>1.0001 && n>Q+1e-6;
+  const sd = qcc*Math.sqrt(ai*(1-ai)/n);
+  if(!useBB && qcc>1.0001){                       // n <= QCC^2 : normal fallback
+    for(let i=0;i<=nPts;i++){
+      const x=i/nPts;
+      xs.push(x);
+      ys.push(Math.exp(-0.5*Math.pow((x-ai)/sd,2))/(sd*Math.sqrt(2*Math.PI)));
+    }
+    return {xs,ys,approx:true,sd};
+  }
+  const d=useBB?(Q-1)/(n-Q):0, A=useBB?ai/d:0, B=useBB?(1-ai)/d:0;
+  const lb0=useBB?lbeta(A,B):0;
+  const step=Math.max(1,Math.ceil((n+1)/nPts));
+  for(let k=0;k<=n;k+=step){
+    let lp;
+    if(useBB) lp=lchoose(n,k)+lbeta(k+A,n-k+B)-lb0;
+    else      lp=lchoose(n,k)+(k?k*Math.log(ai):0)+((n-k)?(n-k)*Math.log(1-ai):0);
+    xs.push(k/n);
+    ys.push(Math.exp(lp)*n);                      // pmf -> density on AI scale
+  }
+  if(xs[xs.length-1]<1){ xs.push(1); ys.push(0); }
+  return {xs,ys,approx:false,sd};
+}
+/* Central (1-alpha) interval of that sampling distribution, on the AI scale.
+   Uses the QCC-deflated normal quantile, consistent with the eBB variance. */
+function centralInterval(n,ai,qcc,z){
+  const sd=qcc*Math.sqrt(ai*(1-ai)/n);
+  return [Math.max(0,ai-z*sd),Math.min(1,ai+z*sd)];
+}
+
+/* ======================= formatting ======================= */
+const f2=v=>v.toFixed(2), f3=v=>v.toFixed(3);
+function fp(p){
+  if(!isFinite(p)) return "—";
+  if(p<1e-4) return p.toExponential(1).replace("e","×10^").replace("-","−");
+  if(p<0.001) return p.toExponential(1);
+  return p.toFixed(3);
+}
+function fnum(v){
+  if(v>=1000) return v.toFixed(0);
+  if(v>=100) return v.toFixed(1);
+  return v.toFixed(1);
+}
+
+/* ======================= svg helpers ======================= */
+const NS="http://www.w3.org/2000/svg";
+function el(tag,attrs,parent){
+  const e=document.createElementNS(NS,tag);
+  for(const k in attrs) e.setAttribute(k,attrs[k]);
+  if(parent) parent.appendChild(e);
+  return e;
+}
+function txt(parent,x,y,s,attrs){
+  const t=el("text",Object.assign({x,y},attrs||{}),parent);
+  t.textContent=s; return t;
+}
+function css(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+
+/* ======================= state ======================= */
+const S={
+  qcc:1.7, qccB:1.7, linkQ:true,
+  showIdeal:true, autoZoom:false, bonf:false, bonfN:10000,
+  s1:{m:66,p:44},
+  s2:{am:66,ap:44,bm:44,bp:66}
+};
+function alpha(){ return S.bonf? 0.05/Math.max(1,S.bonfN) : 0.05; }
+function zcrit(){ return qnorm(1-alpha()/2); }
+
+/* ======================= scenario 1 ======================= */
+function drawS1(){
+  const svg=document.getElementById("svg1");
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  const W=920,L=104,R=26,T=18,dH=190,gap=28,rowH=34;
+  const plotW=W-L-R, x0=L, x1=W-R;
+  const dTop=T, dBot=T+dH;
+  const fTop=dBot+gap, nRows=2, fBot=fTop+nRows*rowH;
+  const axY=fBot+16;
+
+  const m=S.s1.m, p=S.s1.p, n=m+p, ai=m/n, q=S.qcc, Q=q*q, z=zcrit();
+  const neff=n/Q;
+
+  /* x scale, optional zoom */
+  let xlo=0,xhi=1;
+  if(S.autoZoom){
+    const sd=Math.max(q,1)*Math.sqrt(0.25/n);
+    const pad=Math.max(4*sd,Math.abs(ai-0.5)+3*sd);
+    xlo=Math.max(0,0.5-pad); xhi=Math.min(1,0.5+pad);
+  }
+  const sx=v=>x0+(v-xlo)/(xhi-xlo)*plotW;
+
+  /* densities of the NULL (AI = 0.5) */
+  const dQ=aiDensity(n,0.5,q,600);
+  const dB=aiDensity(n,0.5,1,600);
+  const ymax=Math.max.apply(null,dB.ys)*1.08;
+  const sy=v=>dBot-Math.min(v/ymax,1.02)*dH;
+
+  /* --- grid --- */
+  const grid=css("--grid"),axis=css("--axis"),muted=css("--muted"),
+        ink=css("--ink"),ink2=css("--ink2"),s1c=css("--s1"),refc=css("--ref");
+  const ticks=[];
+  const nt=6;
+  for(let i=0;i<=nt;i++) ticks.push(xlo+(xhi-xlo)*i/nt);
+  ticks.forEach(t=>{
+    el("line",{x1:sx(t),x2:sx(t),y1:dTop,y2:fBot,stroke:grid,"stroke-width":1},svg);
+    txt(svg,sx(t),axY+14,(xhi-xlo>0.4?t.toFixed(2):t.toFixed(3)),
+      {fill:muted,"font-size":11.5,"text-anchor":"middle",
+       "font-variant-numeric":"tabular-nums"});
+  });
+  el("line",{x1:x0,x2:x1,y1:axY,y2:axY,stroke:axis,"stroke-width":1},svg);
+  txt(svg,(x0+x1)/2,axY+34,"Allelic imbalance  (maternal / total)",
+    {fill:ink2,"font-size":12.5,"text-anchor":"middle"});
+
+  /* --- rejection zones: outside the central interval of each null --- */
+  const ciB=centralInterval(n,0.5,1,z), ciQ=centralInterval(n,0.5,q,z);
+  const zone=(lo,hi,fill)=>{
+    if(sx(lo)>x0) el("rect",{x:x0,y:dTop,width:Math.max(0,sx(lo)-x0),height:dH,fill},svg);
+    if(sx(hi)<x1) el("rect",{x:sx(hi),y:dTop,width:Math.max(0,x1-sx(hi)),height:dH,fill},svg);
+  };
+  zone(ciB[0],ciB[1],css("--ref-wash"));
+  if(q>1.0001) zone(ciQ[0],ciQ[1],css("--s1-wash"));
+
+  /* --- null line at 0.5 --- */
+  el("line",{x1:sx(0.5),x2:sx(0.5),y1:dTop,y2:fBot,stroke:axis,"stroke-width":1.5},svg);
+  txt(svg,sx(0.5),dTop-4,"1:1",{fill:muted,"font-size":11.5,"text-anchor":"middle"});
+
+  /* --- curves --- */
+  const path=(d,color,dash)=>{
+    let s="";
+    for(let i=0;i<d.xs.length;i++){
+      if(d.xs[i]<xlo-0.02||d.xs[i]>xhi+0.02) continue;
+      s+=(s?"L":"M")+sx(d.xs[i]).toFixed(2)+" "+sy(d.ys[i]).toFixed(2);
+    }
+    el("path",{d:s,fill:"none",stroke:color,"stroke-width":2,
+      "stroke-linejoin":"round","stroke-dasharray":dash||"none"},svg);
+  };
+  if(S.showIdeal) path(dB,refc,"5 4");
+  path(dQ,s1c);
+
+  /* --- observed AI marker --- */
+  const obsX=sx(ai);
+  el("line",{x1:obsX,x2:obsX,y1:dTop,y2:fBot,stroke:ink,"stroke-width":1.5,
+    "stroke-dasharray":"3 3"},svg);
+  txt(svg,obsX,dTop-4,"observed AI "+f3(ai),
+    {fill:ink,"font-size":12,"font-weight":600,
+     "text-anchor":ai>(xlo+xhi)/2?"end":"start",
+     dx:ai>(xlo+xhi)/2?-6:6});
+
+  txt(svg,x0-10,dTop+12,"density",
+    {fill:muted,"font-size":11.5,"text-anchor":"end"});
+
+  /* --- forest rows --- */
+  const rB=propTest1(m,n,0.5,z);
+  const rQ=propTest1(m/Q,n/Q,0.5,z);
+  const rows=[
+    {lab:"binomial",sub:"no correction",r:rB,c:refc},
+    {lab:"QCC-corrected",sub:"QCC = "+f2(q),r:rQ,c:s1c}
+  ];
+  const hits=[];
+  rows.forEach((row,i)=>{
+    const y=fTop+rowH*i+rowH/2;
+    txt(svg,x0-14,y-2,row.lab,{fill:ink,"font-size":12.5,"font-weight":600,
+      "text-anchor":"end"});
+    txt(svg,x0-14,y+12,row.sub,{fill:muted,"font-size":11,"text-anchor":"end"});
+    const lo=sx(Math.max(row.r.lo,xlo)),hi=sx(Math.min(row.r.hi,xhi));
+    el("line",{x1:lo,x2:hi,y1:y,y2:y,stroke:row.c,"stroke-width":2,
+      "stroke-linecap":"round"},svg);
+    [lo,hi].forEach(cx=>el("line",{x1:cx,x2:cx,y1:y-5,y2:y+5,stroke:row.c,
+      "stroke-width":2},svg));
+    const cx=sx(ai);
+    el("path",{d:`M${cx} ${y-7}L${cx+7} ${y}L${cx} ${y+7}L${cx-7} ${y}Z`,
+      fill:row.c,stroke:css("--surface"),"stroke-width":2},svg);
+    const sig=row.r.p<alpha();
+    txt(svg,x1+0,y+4,"",{});
+    hits.push({y0:fTop+rowH*i,y1:fTop+rowH*(i+1),
+      html:`<b>${row.lab}</b><br><span class="k">AI</span>${f3(ai)}<br>`+
+           `<span class="k">${((1-alpha())*100).toFixed(alpha()<0.001?3:0)}% CI</span>`+
+           `${f3(row.r.lo)} – ${f3(row.r.hi)}<br>`+
+           `<span class="k">p</span>${fp(row.r.p)}<br>`+
+           `<span class="k">call</span>${sig?"AI ≠ 0.5":"no AI call"}`});
+  });
+
+  attachHover(svg,"tip1",{x0,x1,dTop,dBot,fTop,fBot,sx,xlo,xhi,
+    curves:[{name:"QCC = "+f2(q),d:dQ,c:s1c},
+            S.showIdeal?{name:"binomial",d:dB,c:refc}:null].filter(Boolean),
+    rows:hits});
+
+  /* --- verdict + tiles --- */
+  const flip = (rB.p<alpha()) !== (rQ.p<alpha());
+  drawVerdict("verdict1",{
+    binSig:rB.p<alpha(), binP:rB.p,
+    qccSig:rQ.p<alpha(), qccP:rQ.p,
+    qLabel:"at QCC = "+f2(q),
+    on:"Allelic imbalance", off:"No call",
+    onSub:"the CI excludes 1:1", offSub:"the CI covers 1:1"});
+  document.getElementById("tiles1").innerHTML=`
+    <div class="tile"><div class="k">AI point estimate</div>
+      <div class="v">${f3(ai)}<small> &nbsp;${m}/${n}</small></div></div>
+    <div class="tile"><div class="k">Effective coverage</div>
+      <div class="v">${fnum(neff)}<small> &nbsp;of ${n}</small></div></div>
+    <div class="tile"><div class="k">CI &mdash; binomial</div>
+      <div class="v" style="font-size:15px">${f3(rB.lo)} – ${f3(rB.hi)}
+      <small><br>p = ${fp(rB.p)}</small></div></div>
+    <div class="tile acc"><div class="k">CI &mdash; QCC-corrected</div>
+      <div class="v" style="font-size:15px">${f3(rQ.lo)} – ${f3(rQ.hi)}
+      <small><br>p = ${fp(rQ.p)}</small></div></div>`;
+
+  const call=document.getElementById("call1");
+  call.className="callout"+(flip?" warn":"");
+  if(flip && rB.p<alpha()){
+    call.innerHTML=`At QCC&nbsp;=&nbsp;<b>${f2(q)}</b> this gene is <b>no longer called</b>
+      as allelically imbalanced (p ${fp(rB.p)} &rarr; ${fp(rQ.p)}). The point estimate is
+      unchanged at ${f3(ai)}; the CI widened from
+      ${f3(rB.hi-rB.lo)} to ${f3(rQ.hi-rQ.lo)} wide, because ${n} reads carry the
+      information of only ${fnum(neff)}.`;
+  } else if(flip){
+    call.innerHTML=`Unusual case: the QCC-corrected test calls this gene while the
+      uncorrected one does not (p ${fp(rB.p)} &rarr; ${fp(rQ.p)}). This can happen
+      near the threshold because the Yates continuity correction is relatively larger
+      on the deflated counts.`;
+  } else if(q<=1.0001){
+    call.innerHTML=`QCC&nbsp;=&nbsp;1.00 means no overdispersion, so the corrected test
+      <i>is</i> the binomial test (p ${fp(rB.p)}) and the two curves coincide. Raise QCC
+      to see the null widen while the point estimate ${f3(ai)} stays put.`;
+  } else if(rQ.p<alpha()){
+    call.innerHTML=`The call <b>survives</b> QCC&nbsp;=&nbsp;${f2(q)}
+      (p ${fp(rB.p)} &rarr; ${fp(rQ.p)}). Coverage of ${n} reads is deep enough that even
+      at an effective ${fnum(neff)} reads the interval
+      ${f3(rQ.lo)}&ndash;${f3(rQ.hi)} excludes 0.5.`;
+  } else {
+    call.innerHTML=`No AI call under either model (p ${fp(rB.p)} binomial,
+      ${fp(rQ.p)} corrected). Raise the coverage or the bias to see the two tests
+      disagree.`;
+  }
+  if(dQ.approx) call.innerHTML+=` <b>Note:</b> coverage ${n} is below QCC&sup2; =
+    ${f2(Q)}; the beta-binomial is undefined there, so the curve shown is the matching
+    normal approximation.`;
+  if(rQ.minE<5) call.innerHTML+=` <b>Note:</b> the deflated counts leave an expected
+    cell of ${rQ.minE.toFixed(1)} (&lt;&nbsp;5), where the &chi;&sup2; approximation
+    behind <code>prop.test</code> is unreliable &mdash; R issues the same warning.`;
+
+  document.getElementById("tbl1").innerHTML=`
+    <tr><th>Model</th><th>maternal</th><th>total</th><th>AI</th>
+        <th>CI low</th><th>CI high</th><th>p</th><th>call</th></tr>
+    <tr><td>binomial</td><td>${m}</td><td>${n}</td><td>${f3(ai)}</td>
+        <td>${f3(rB.lo)}</td><td>${f3(rB.hi)}</td><td>${fp(rB.p)}</td>
+        <td>${rB.p<alpha()?"AI ≠ 0.5":"no call"}</td></tr>
+    <tr><td>QCC = ${f2(q)}</td><td>${(m/Q).toFixed(1)}</td><td>${neff.toFixed(1)}</td>
+        <td>${f3(ai)}</td><td>${f3(rQ.lo)}</td><td>${f3(rQ.hi)}</td>
+        <td>${fp(rQ.p)}</td><td>${rQ.p<alpha()?"AI ≠ 0.5":"no call"}</td></tr>`;
+
+  document.getElementById("lg1").innerHTML=
+    legItem(refc,"binomial null (QCC = 1.0)","5 4")+
+    legItem(s1c,"null at QCC = "+f2(q))+
+    `<span><span style="width:22px;height:11px;background:${css("--ref-wash")};
+      border:1px solid ${css("--border")};display:inline-block"></span>
+      rejection zone, binomial</span>`+
+    `<span><span style="width:22px;height:11px;background:${css("--s1-wash")};
+      border:1px solid ${css("--border")};display:inline-block"></span>
+      rejection zone, QCC</span>`;
+}
+
+/* ======================= scenario 2 ======================= */
+function drawS2(){
+  const svg=document.getElementById("svg2");
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  const W=920,L=104,R=26,T=18,dH=190,gap=32,rowH=32;
+  const plotW=W-L-R,x0=L,x1=W-R;
+  const dTop=T,dBot=T+dH;
+  const fTop=dBot+gap,nRows=4,fBot=fTop+nRows*rowH+10;
+  const axY=fBot+10;
+
+  const a=S.s2, na=a.am+a.ap, nb=a.bm+a.bp;
+  const aiA=a.am/na, aiB=a.bm/nb, z=zcrit();
+  const qA=S.qcc, qB=S.linkQ?S.qcc:S.qccB, QA=qA*qA, QB=qB*qB;
+
+  let xlo=0,xhi=1;
+  if(S.autoZoom){
+    const sdA=qA*Math.sqrt(aiA*(1-aiA)/na), sdB=qB*Math.sqrt(aiB*(1-aiB)/nb);
+    xlo=Math.max(0,Math.min(aiA-4*sdA,aiB-4*sdB));
+    xhi=Math.min(1,Math.max(aiA+4*sdA,aiB+4*sdB));
+    if(xhi-xlo<0.05){const c=(xhi+xlo)/2;xlo=Math.max(0,c-0.025);xhi=Math.min(1,c+0.025);}
+  }
+  const sx=v=>x0+(v-xlo)/(xhi-xlo)*plotW;
+
+  const dAQ=aiDensity(na,aiA,qA,600), dAB=aiDensity(na,aiA,1,600);
+  const dBQ=aiDensity(nb,aiB,qB,600), dBB=aiDensity(nb,aiB,1,600);
+  const ymax=Math.max(Math.max.apply(null,dAB.ys),Math.max.apply(null,dBB.ys))*1.08;
+  const sy=v=>dBot-Math.min(v/ymax,1.02)*dH;
+
+  const grid=css("--grid"),axis=css("--axis"),muted=css("--muted"),
+        ink=css("--ink"),ink2=css("--ink2"),c1=css("--s1"),c2=css("--s2");
+  const nt=6;
+  for(let i=0;i<=nt;i++){
+    const t=xlo+(xhi-xlo)*i/nt;
+    el("line",{x1:sx(t),x2:sx(t),y1:dTop,y2:fBot,stroke:grid,"stroke-width":1},svg);
+    txt(svg,sx(t),axY+14,(xhi-xlo>0.4?t.toFixed(2):t.toFixed(3)),
+      {fill:muted,"font-size":11.5,"text-anchor":"middle",
+       "font-variant-numeric":"tabular-nums"});
+  }
+  el("line",{x1:x0,x2:x1,y1:axY,y2:axY,stroke:axis,"stroke-width":1},svg);
+  txt(svg,(x0+x1)/2,axY+34,"Allelic imbalance  (maternal / total)",
+    {fill:ink2,"font-size":12.5,"text-anchor":"middle"});
+  el("line",{x1:sx(0.5),x2:sx(0.5),y1:dTop,y2:fBot,stroke:axis,"stroke-width":1.5},svg);
+  txt(svg,sx(0.5),dTop-4,"1:1",{fill:muted,"font-size":11.5,"text-anchor":"middle"});
+  txt(svg,x0-10,dTop+12,"density",{fill:muted,"font-size":11.5,"text-anchor":"end"});
+
+  const path=(d,color,dash,wid)=>{
+    let s="";
+    for(let i=0;i<d.xs.length;i++){
+      if(d.xs[i]<xlo-0.02||d.xs[i]>xhi+0.02) continue;
+      s+=(s?"L":"M")+sx(d.xs[i]).toFixed(2)+" "+sy(d.ys[i]).toFixed(2);
+    }
+    el("path",{d:s,fill:"none",stroke:color,"stroke-width":wid||2,
+      "stroke-linejoin":"round","stroke-dasharray":dash||"none"},svg);
+  };
+  if(S.showIdeal){ path(dAB,c1,"5 4",1.5); path(dBB,c2,"5 4",1.5); }
+  path(dAQ,c1); path(dBQ,c2);
+
+  txt(svg,sx(aiA),sy(Math.max.apply(null,dAQ.ys))-8,"A",
+    {fill:c1,"font-size":13,"font-weight":700,"text-anchor":"middle"});
+  txt(svg,sx(aiB),sy(Math.max.apply(null,dBQ.ys))-8,"B",
+    {fill:c2,"font-size":13,"font-weight":700,"text-anchor":"middle"});
+
+  /* forest: 2 groups x 2 samples */
+  const rAB=propTest1(a.am,na,0.5,z), rBB=propTest1(a.bm,nb,0.5,z);
+  const rAQ=propTest1(a.am/QA,na/QA,0.5,z), rBQ=propTest1(a.bm/QB,nb/QB,0.5,z);
+  const rows=[
+    {grp:"binomial",lab:"sample A",r:rAB,c:c1,ai:aiA},
+    {grp:"",        lab:"sample B",r:rBB,c:c2,ai:aiB},
+    {grp:"iQCC-corrected",lab:"sample A · iQCC "+f2(qA),r:rAQ,c:c1,ai:aiA},
+    {grp:"",        lab:"sample B · iQCC "+f2(qB),r:rBQ,c:c2,ai:aiB}
+  ];
+  const hits=[];
+  rows.forEach((row,i)=>{
+    const y=fTop+rowH*i+rowH/2+(i>=2?10:0);
+    if(row.grp) txt(svg,x0-14,y-8,row.grp,{fill:ink,"font-size":12,"font-weight":650,
+      "text-anchor":"end"});
+    txt(svg,x0-14,y+(row.grp?8:4),row.lab,{fill:muted,"font-size":11.5,"text-anchor":"end"});
+    const lo=sx(Math.max(row.r.lo,xlo)),hi=sx(Math.min(row.r.hi,xhi));
+    el("line",{x1:lo,x2:hi,y1:y,y2:y,stroke:row.c,"stroke-width":2,
+      "stroke-linecap":"round"},svg);
+    [lo,hi].forEach(cx=>el("line",{x1:cx,x2:cx,y1:y-5,y2:y+5,stroke:row.c,
+      "stroke-width":2},svg));
+    const cx=sx(row.ai);
+    el("path",{d:`M${cx} ${y-7}L${cx+7} ${y}L${cx} ${y+7}L${cx-7} ${y}Z`,
+      fill:row.c,stroke:css("--surface"),"stroke-width":2},svg);
+    hits.push({y0:y-rowH/2,y1:y+rowH/2,
+      html:`<b>${row.lab}</b> &middot; ${i<2?"binomial":"iQCC-corrected"}<br>`+
+           `<span class="k">AI</span>${f3(row.ai)}<br>`+
+           `<span class="k">CI</span>${f3(row.r.lo)} – ${f3(row.r.hi)}<br>`+
+           `<span class="k">p vs 0.5</span>${fp(row.r.p)}`});
+  });
+
+  attachHover(svg,"tip2",{x0,x1,dTop,dBot,fTop,fBot,sx,xlo,xhi,
+    curves:[{name:"A, iQCC "+f2(qA),d:dAQ,c:c1},{name:"B, iQCC "+f2(qB),d:dBQ,c:c2}]
+      .concat(S.showIdeal?[{name:"A, binomial",d:dAB,c:c1},
+                           {name:"B, binomial",d:dBB,c:c2}]:[]),
+    rows:hits});
+
+  /* differential test — each sample deflated by its own iQCC² */
+  const dBin=propTest2(a.am,na,a.bm,nb,z);
+  const dQcc=propTest2(a.am/QA,na/QA,a.bm/QB,nb/QB,z);
+  const flip=(dBin.p<alpha())!==(dQcc.p<alpha());
+  const overlap = !(rAQ.hi<rBQ.lo || rBQ.hi<rAQ.lo);
+
+  drawVerdict("verdict2",{
+    binSig:dBin.p<alpha(), binP:dBin.p,
+    qccSig:dQcc.p<alpha(), qccP:dQcc.p,
+    qLabel:"at iQCC "+f2(qA)+" / "+f2(qB),
+    on:"Differential AI", off:"No difference",
+    onSub:"A and B differ at this gene",
+    offSub:"A and B are indistinguishable"});
+  document.getElementById("tiles2").innerHTML=`
+    <div class="tile"><div class="k">AI, sample A</div>
+      <div class="v" style="color:${c1}">${f3(aiA)}<small> &nbsp;${a.am}/${na}
+      <br>eff. cov ${fnum(na/QA)} at iQCC ${f2(qA)}</small></div></div>
+    <div class="tile"><div class="k">AI, sample B</div>
+      <div class="v" style="color:${c2}">${f3(aiB)}<small> &nbsp;${a.bm}/${nb}
+      <br>eff. cov ${fnum(nb/QB)} at iQCC ${f2(qB)}</small></div></div>
+    <div class="tile"><div class="k">&Delta;AI (A &minus; B)</div>
+      <div class="v">${(aiA-aiB>=0?"+":"−")+Math.abs(aiA-aiB).toFixed(3)}</div></div>
+    <div class="tile"><div class="k">Differential &mdash; binomial</div>
+      <div class="v" style="font-size:15px">p = ${fp(dBin.p)}
+      <small><br>&Delta; CI ${f3(dBin.lo)} – ${f3(dBin.hi)}</small></div></div>
+    <div class="tile acc"><div class="k">Differential &mdash; iQCC ${f2(qA)}&thinsp;/&thinsp;${f2(qB)}</div>
+      <div class="v" style="font-size:15px">p = ${fp(dQcc.p)}
+      <small><br>&Delta; CI ${f3(dQcc.lo)} – ${f3(dQcc.hi)}</small></div></div>`;
+
+  const call=document.getElementById("call2");
+  call.className="callout"+(flip?" warn":"");
+  const qtxt = Math.abs(qA-qB)<1e-9
+    ? `iQCC&nbsp;=&nbsp;<b>${f2(qA)}</b> in both samples`
+    : `iQCC&nbsp;<b>${f2(qA)}</b> in A and <b>${f2(qB)}</b> in B`;
+  const worse = qA>qB ? "A" : "B";
+  const asym = Math.abs(qA-qB)<1e-9 ? "" :
+    ` The noisier library (sample&nbsp;${worse}, iQCC ${f2(Math.max(qA,qB))}) dominates:
+      its ${worse==="A"?na:nb} reads carry the information of only
+      ${fnum(worse==="A"?na/QA:nb/QB)}, so it sets the resolution of the comparison
+      no matter how clean the other sample is.`;
+  if(flip && dBin.p<alpha()){
+    call.innerHTML=`At ${qtxt} these two samples are <b>no longer distinguishable</b>
+      at this gene (p ${fp(dBin.p)} &rarr; ${fp(dQcc.p)}).
+      &Delta;AI is still ${Math.abs(aiA-aiB).toFixed(3)}, but its interval widened from
+      ${f3(dBin.hi-dBin.lo)} to ${f3(dQcc.hi-dQcc.lo)} wide and now covers zero.`+asym;
+  } else if(flip){
+    call.innerHTML=`The corrected test calls a difference where the uncorrected one
+      does not (p ${fp(dBin.p)} &rarr; ${fp(dQcc.p)}) &mdash; a threshold artefact of the
+      Yates correction on deflated counts, not a real gain in power.`;
+  } else if(dQcc.p<alpha()){
+    call.innerHTML=`The difference <b>survives</b> at ${qtxt}
+      (p ${fp(dBin.p)} &rarr; ${fp(dQcc.p)}). Note the per-sample CIs
+      ${overlap?"still overlap":"do not overlap"} &mdash; non-overlapping CIs is a
+      stricter criterion than the two-sample test.`+asym;
+  } else {
+    call.innerHTML=`No differential call under either model (p ${fp(dBin.p)} binomial,
+      ${fp(dQcc.p)} corrected at ${qtxt}).`;
+  }
+  if(dAQ.approx||dBQ.approx) call.innerHTML+=` <b>Note:</b> coverage in
+    sample ${dAQ.approx?"A":"B"} is below its iQCC&sup2;; the beta-binomial is undefined
+    there, so that curve is the matching normal approximation.`;
+  if(dQcc.minE<5) call.innerHTML+=` <b>Note:</b> the deflated counts leave an expected
+    cell of ${dQcc.minE.toFixed(1)} (&lt;&nbsp;5), where the &chi;&sup2; approximation
+    behind <code>prop.test</code> is unreliable &mdash; R issues the same warning.`;
+
+  document.getElementById("tbl2").innerHTML=`
+    <tr><th>Row</th><th>maternal</th><th>total</th><th>AI</th>
+        <th>CI low</th><th>CI high</th></tr>
+    <tr><td>A, binomial</td><td>${a.am}</td><td>${na}</td><td>${f3(aiA)}</td>
+        <td>${f3(rAB.lo)}</td><td>${f3(rAB.hi)}</td></tr>
+    <tr><td>B, binomial</td><td>${a.bm}</td><td>${nb}</td><td>${f3(aiB)}</td>
+        <td>${f3(rBB.lo)}</td><td>${f3(rBB.hi)}</td></tr>
+    <tr><td>A, iQCC = ${f2(qA)}</td><td>${(a.am/QA).toFixed(1)}</td>
+        <td>${(na/QA).toFixed(1)}</td><td>${f3(aiA)}</td>
+        <td>${f3(rAQ.lo)}</td><td>${f3(rAQ.hi)}</td></tr>
+    <tr><td>B, iQCC = ${f2(qB)}</td><td>${(a.bm/QB).toFixed(1)}</td>
+        <td>${(nb/QB).toFixed(1)}</td><td>${f3(aiB)}</td>
+        <td>${f3(rBQ.lo)}</td><td>${f3(rBQ.hi)}</td></tr>
+    <tr><td>&Delta;AI, binomial</td><td colspan="2"></td>
+        <td>${f3(dBin.delta)}</td><td>${f3(dBin.lo)}</td><td>${f3(dBin.hi)}</td></tr>
+    <tr><td>&Delta;AI, iQCC ${f2(qA)}/${f2(qB)}</td><td colspan="2"></td>
+        <td>${f3(dQcc.delta)}</td><td>${f3(dQcc.lo)}</td><td>${f3(dQcc.hi)}</td></tr>`;
+
+  document.getElementById("lg2").innerHTML=
+    legItem(c1,"sample A, iQCC = "+f2(qA))+
+    legItem(c2,"sample B, iQCC = "+f2(qB))+
+    (S.showIdeal?legItem(c1,"A, binomial","5 4")+legItem(c2,"B, binomial","5 4"):"");
+}
+
+/* ======================= shared UI bits ======================= */
+function legItem(color,label,dash){
+  return `<span><span class="swatch" style="border-top-color:${color};`+
+         (dash?`border-top-style:dashed;`:``)+`"></span>${label}</span>`;
+}
+/* Big before/after verdict banner. `spec` = {binSig,binP,qccSig,qccP,qLabel,on,off,
+   onSub,offSub}. Pulses whenever the corrected call changes. */
+const lastCall={};
+function drawVerdict(id,spec){
+  const box=document.getElementById(id);
+  const flip = spec.binSig!==spec.qccSig;
+  const aTxt = alpha()<0.001 ? alpha().toExponential(1) : "0.05";
+  box.innerHTML=`
+    <div class="vside ${spec.binSig?"on":"off"}">
+      <div class="k">binomial test</div>
+      <div class="lab">${spec.binSig?spec.on:spec.off}</div>
+      <div class="sub">p = ${fp(spec.binP)}</div>
+    </div>
+    <div class="varrow" aria-hidden="true">&rarr;</div>
+    <div class="vmain ${spec.qccSig?"on":"off"}">
+      <div class="k">${spec.qLabel}</div>
+      <div class="big"><span class="glyph"></span>${spec.qccSig?spec.on:spec.off}</div>
+      <div class="sub">p = ${fp(spec.qccP)} &nbsp;&middot;&nbsp; &alpha; = ${aTxt}
+        &nbsp;&middot;&nbsp; ${spec.qccSig?spec.onSub:spec.offSub}</div>
+    </div>`;
+  box.classList.toggle("flipped",flip);
+  if(lastCall[id]!==undefined && lastCall[id]!==spec.qccSig){
+    box.classList.remove("pulse"); void box.offsetWidth; box.classList.add("pulse");
+  }
+  lastCall[id]=spec.qccSig;
+}
+
+
+function attachHover(svg,tipId,cfg){
+  const tip=document.getElementById(tipId);
+  const rect=el("rect",{x:cfg.x0,y:cfg.dTop,width:cfg.x1-cfg.x0,
+    height:cfg.fBot-cfg.dTop,fill:"transparent"},svg);
+  const cross=el("line",{x1:0,x2:0,y1:cfg.dTop,y2:cfg.dBot,
+    stroke:css("--ink"),"stroke-width":1,opacity:0,"pointer-events":"none"},svg);
+  const vbW=920;
+  function move(ev){
+    const br=svg.getBoundingClientRect(), k=br.width/vbW;
+    const px=(ev.clientX-br.left)/k, py=(ev.clientY-br.top)/k;
+    if(px<cfg.x0||px>cfg.x1){leave();return;}
+    const aiv=cfg.xlo+(px-cfg.x0)/(cfg.x1-cfg.x0)*(cfg.xhi-cfg.xlo);
+    let html;
+    const row=cfg.rows.find(r=>py>=r.y0&&py<=r.y1);
+    if(row && py>=cfg.fTop){ html=row.html; cross.setAttribute("opacity",0); }
+    else {
+      cross.setAttribute("x1",px);cross.setAttribute("x2",px);
+      cross.setAttribute("opacity",0.35);
+      html=`<b>AI ${aiv.toFixed(3)}</b>`;
+      cfg.curves.forEach(c=>{
+        let best=0,bd=1e9;
+        for(let i=0;i<c.d.xs.length;i++){
+          const dd=Math.abs(c.d.xs[i]-aiv);
+          if(dd<bd){bd=dd;best=i;}
+        }
+        html+=`<br><span class="k" style="color:${c.c}">${c.name}</span>`+
+              `${c.d.ys[best].toFixed(2)}`;
+      });
+    }
+    tip.innerHTML=html;
+    tip.style.opacity=1;
+    const tw=tip.offsetWidth;
+    let lx=px*k+14; if(lx+tw>br.width) lx=px*k-tw-14;
+    tip.style.left=Math.max(0,lx)+"px";
+    tip.style.top=Math.max(0,py*k-10)+"px";
+  }
+  function leave(){tip.style.opacity=0;cross.setAttribute("opacity",0);}
+  rect.addEventListener("mousemove",move);
+  rect.addEventListener("mouseleave",leave);
+}
+
+/* ======================= wiring ======================= */
+function hintFor(q){
+  return q<=1.0001 ? "no overdispersion — pure binomial sampling"
+    : `variance inflated ${f2(q*q)}× — same as sequencing ${f2(q*q)}× fewer allelic reads`;
+}
+function render(){
+  if(S.linkQ) S.qccB=S.qcc;
+  document.getElementById("qccOut").textContent=f2(S.qcc);
+  document.getElementById("qccAOut").textContent=f2(S.qcc);
+  document.getElementById("qccBOut").textContent=f2(S.qccB);
+  document.getElementById("qccA").value=S.qcc;
+  document.getElementById("qccB").value=S.qccB;
+  document.getElementById("qccB").disabled=S.linkQ;
+  document.getElementById("qccHint").textContent=hintFor(S.qcc);
+  document.getElementById("qccAHint").textContent=hintFor(S.qcc);
+  document.getElementById("alphaHint").textContent=
+    "α = "+(S.bonf?(0.05/Math.max(1,S.bonfN)).toExponential(1):"0.05")+" (two-sided)";
+  document.querySelectorAll("#qccPresets .preset").forEach(b=>
+    b.setAttribute("aria-pressed", Math.abs(+b.dataset.q-S.qcc)<1e-9));
+  document.querySelectorAll("#qPresets .preset").forEach(b=>
+    b.setAttribute("aria-pressed",
+      Math.abs(+b.dataset.qa-S.qcc)<1e-9 && Math.abs(+b.dataset.qb-S.qccB)<1e-9));
+  document.querySelectorAll("#s1Presets .preset").forEach(b=>
+    b.setAttribute("aria-pressed", +b.dataset.m===S.s1.m && +b.dataset.p===S.s1.p));
+  document.querySelectorAll("#s2Presets .preset").forEach(b=>{
+    const v=b.dataset.v.split(",").map(Number);
+    b.setAttribute("aria-pressed",
+      v[0]===S.s2.am&&v[1]===S.s2.ap&&v[2]===S.s2.bm&&v[3]===S.s2.bp);});
+  if(!document.getElementById("sc1").hidden) drawS1(); else drawS2();
+}
+function bindNum(id,get,set){
+  const e=document.getElementById(id);
+  e.addEventListener("input",()=>{
+    const v=parseFloat(e.value);
+    if(isFinite(v)&&v>=1){set(Math.round(v));render();}
+  });
+}
+document.getElementById("qcc").addEventListener("input",e=>{
+  S.qcc=parseFloat(e.target.value);render();});
+document.querySelectorAll("#qccPresets .preset").forEach(b=>
+  b.addEventListener("click",()=>{
+    S.qcc=+b.dataset.q;document.getElementById("qcc").value=S.qcc;render();}));
+document.getElementById("qccA").addEventListener("input",e=>{
+  S.qcc=parseFloat(e.target.value);
+  document.getElementById("qcc").value=S.qcc;render();});
+document.getElementById("qccB").addEventListener("input",e=>{
+  S.qccB=parseFloat(e.target.value);render();});
+document.getElementById("linkQ").addEventListener("change",e=>{
+  S.linkQ=e.target.checked;render();});
+document.querySelectorAll("#qPresets .preset").forEach(b=>
+  b.addEventListener("click",()=>{
+    S.qcc=+b.dataset.qa; S.qccB=+b.dataset.qb;
+    S.linkQ = Math.abs(S.qcc-S.qccB)<1e-9;
+    document.getElementById("linkQ").checked=S.linkQ;
+    document.getElementById("qcc").value=S.qcc;
+    render();}));
+document.getElementById("showIdeal").addEventListener("change",e=>{
+  S.showIdeal=e.target.checked;render();});
+document.getElementById("autoZoom").addEventListener("change",e=>{
+  S.autoZoom=e.target.checked;render();});
+document.getElementById("bonf").addEventListener("change",e=>{
+  S.bonf=e.target.checked;render();});
+document.getElementById("bonfN").addEventListener("input",e=>{
+  const v=parseInt(e.target.value,10);
+  if(isFinite(v)&&v>=1){S.bonfN=v;render();}});
+
+bindNum("s1mat",()=>S.s1.m,v=>{S.s1.m=v;syncCov();});
+bindNum("s1pat",()=>S.s1.p,v=>{S.s1.p=v;syncCov();});
+function syncCov(){document.getElementById("s1cov").value=
+  Math.min(2000,Math.max(20,S.s1.m+S.s1.p));}
+document.getElementById("s1cov").addEventListener("input",e=>{
+  const target=+e.target.value, n=S.s1.m+S.s1.p, ai=S.s1.m/n;
+  S.s1.m=Math.max(1,Math.round(target*ai));
+  S.s1.p=Math.max(1,target-S.s1.m);
+  document.getElementById("s1mat").value=S.s1.m;
+  document.getElementById("s1pat").value=S.s1.p;
+  render();
+});
+document.querySelectorAll("#s1Presets .preset").forEach(b=>
+  b.addEventListener("click",()=>{
+    S.s1.m=+b.dataset.m;S.s1.p=+b.dataset.p;
+    document.getElementById("s1mat").value=S.s1.m;
+    document.getElementById("s1pat").value=S.s1.p;
+    syncCov();render();}));
+
+bindNum("s2amat",0,v=>S.s2.am=v); bindNum("s2apat",0,v=>S.s2.ap=v);
+bindNum("s2bmat",0,v=>S.s2.bm=v); bindNum("s2bpat",0,v=>S.s2.bp=v);
+document.querySelectorAll("#s2Presets .preset").forEach(b=>
+  b.addEventListener("click",()=>{
+    const v=b.dataset.v.split(",").map(Number);
+    S.s2.am=v[0];S.s2.ap=v[1];S.s2.bm=v[2];S.s2.bp=v[3];
+    ["s2amat","s2apat","s2bmat","s2bpat"].forEach((id,i)=>
+      document.getElementById(id).value=v[i]);
+    render();}));
+
+function selectTab(which){
+  const t1=document.getElementById("tab1"),t2=document.getElementById("tab2");
+  t1.setAttribute("aria-selected",which===1); t2.setAttribute("aria-selected",which===2);
+  document.getElementById("sc1").hidden=which!==1;
+  document.getElementById("sc2").hidden=which!==2;
+  document.getElementById("ctl1").hidden=which!==1;   // sidebar follows the tab
+  document.getElementById("ctl2").hidden=which!==2;
+  render();
+}
+document.getElementById("tab1").addEventListener("click",()=>selectTab(1));
+document.getElementById("tab2").addEventListener("click",()=>selectTab(2));
+
+syncCov();
+render();
+window.addEventListener("resize",()=>{});
+</script>
+</body>
+</html>
