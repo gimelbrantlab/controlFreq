@@ -20,7 +20,7 @@ remotes::install_github("gimelbrantlab/controlFreq")
 ```
 compute_iQCC_for_selected_samples(df = allelic-counts-table, reps = 1:10, sup_Q = 30)
 ```
-see [Wiki](https://github.com/gimelbrantlab/controlFreq/wiki) for more details.
+see [Wiki](https://github.com/gimelbrantlab/controlFreq/wiki) and [Detailed-usage-with-examples](https://github.com/gimelbrantlab/controlFreq/wiki/Detailed-usage-with-examples) for more details.
 
 ## Related repositories:
 
