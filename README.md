@@ -6,6 +6,8 @@ This R-package performs **sample overdispersion estimation** from RNA spike-ins 
 Citation: A. Mendelevich, S. Gupta, A. Pakharev, A. Teodosiadis, A. A. Mironov, A. A. Gimelbrant. _Foreign RNA spike-ins enable accurate allele-specific expression analysis at scale_. Bioinformatics 39, i431–i439 (2023).
 _[link](https://academic.oup.com/bioinformatics/article/39/Supplement_1/i431/7210455)_
 
+## Why this is necessary:
+https://gimelbrantlab.github.io/controlFreq/qcc-demo.html
 
 ## Installation:
 ```
