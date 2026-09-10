@@ -10,6 +10,7 @@ _[link](https://academic.oup.com/bioinformatics/article/39/Supplement_1/i431/721
 ## Installation:
 ```
 docker pull sasha/ase
+docker pull sasha/ase_data    ### for example datasets
 ```
 or
 ```
